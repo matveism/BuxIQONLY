@@ -81,7 +81,7 @@ const Index = () => {
     }
 
     const points = parseFloat(cashoutAmount);
-    if (isNaN(points) {
+    if (isNaN(points)) {
       alert('Please enter a valid amount');
       return;
     }
