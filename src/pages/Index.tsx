@@ -34,6 +34,14 @@ import NotificationBanner from '@/components/NotificationBanner';
 const Index = () => {
   const [activeTab, setActiveTab] = useState('home');
   const [loginForm, setLoginForm] = useState({ account: '', clientId: '', captcha: '' });
+  const [cashoutForm, setCashoutForm] = useState({
+    method: '',
+    amount: '',
+    email: '',
+    walletAddress: '',
+    country: 'US'
+  });
+  const [cashoutSuccess, setCashoutSuccess] = useState(false);
   
   const { currentUser, isLoggedIn, captchaCode, login, logout, updateBalance, generateCaptcha } = useAuth();
   const { isIframeOpen, iframeUrl, openOfferwall, closeIframe } = useOfferwall();
@@ -67,6 +75,53 @@ const Index = () => {
       return;
     }
     openOfferwall(buttonId, currentUser.username || currentUser.account);
+  };
+
+  const handleCashoutSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isLoggedIn || !currentUser) {
+      alert('Please login first to cash out');
+      return;
+    }
+
+    const points = parseFloat(cashoutForm.amount) * 200;
+    const totalPoints = points + 50; // Adding 50 points fee
+
+    if (totalPoints > userBalance) {
+      alert('You don\'t have enough points for this cashout');
+      return;
+    }
+
+    if (points < 250) { // 250 points minimum (200 + 50 fee)
+      alert('Minimum cashout is 250 points ($1 + 50 points fee)');
+      return;
+    }
+
+    // Here you would normally send the cashout request to your backend
+    console.log('Cashout request:', {
+      method: cashoutForm.method,
+      amount: cashoutForm.amount,
+      points: points,
+      fee: 50,
+      totalPoints: totalPoints,
+      user: currentUser.account,
+      email: cashoutForm.email,
+      walletAddress: cashoutForm.walletAddress,
+      country: cashoutForm.country
+    });
+
+    // Simulate successful cashout
+    setCashoutSuccess(true);
+    setTimeout(() => {
+      setCashoutSuccess(false);
+      setCashoutForm({
+        method: '',
+        amount: '',
+        email: '',
+        walletAddress: '',
+        country: 'US'
+      });
+    }, 3000);
   };
 
   useEffect(() => {
@@ -124,6 +179,49 @@ const Index = () => {
       logo: 'https://i.imgur.com/K5in0eX.png',
       color: 'from-blue-500 to-indigo-600',
       description: 'Claim daily bonuses'
+    }
+  ];
+
+  const cashoutMethods = [
+    {
+      id: 'ltc',
+      name: 'Litecoin (LTC)',
+      icon: <Coins className="w-6 h-6" />,
+      description: 'Cryptocurrency payment to your wallet',
+      minAmount: '$5',
+      fields: ['walletAddress']
+    },
+    {
+      id: 'amazon-us',
+      name: 'Amazon US Gift Card',
+      icon: <Gift className="w-6 h-6" />,
+      description: 'Digital gift card for Amazon.com',
+      minAmount: '$5',
+      fields: ['email']
+    },
+    {
+      id: 'amazon-uk',
+      name: 'Amazon UK Gift Card',
+      icon: <Gift className="w-6 h-6" />,
+      description: 'Digital gift card for Amazon.co.uk',
+      minAmount: '$5',
+      fields: ['email']
+    },
+    {
+      id: 'tesco',
+      name: 'TESCO Gift Card',
+      icon: <Gift className="w-6 h-6" />,
+      description: 'Digital gift card for TESCO stores',
+      minAmount: '$5',
+      fields: ['email']
+    },
+    {
+      id: 'aldi',
+      name: 'ALDI Gift Card',
+      icon: <Gift className="w-6 h-6" />,
+      description: 'Digital gift card for ALDI stores',
+      minAmount: '$5',
+      fields: ['email']
     }
   ];
 
@@ -535,26 +633,179 @@ const Index = () => {
               <p className="text-muted-foreground mb-8">Redeem your earnings for amazing rewards</p>
             </div>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {rewards.map((reward, index) => (
-                <Card key={index} className="modern-card hover-lift group">
-                  <CardHeader className="text-center">
-                    <div className={`w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-r ${reward.color} flex items-center justify-center text-white group-hover:scale-110 transition-transform`}>
-                      {reward.icon}
+            {cashoutSuccess && (
+              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 text-green-500 flex items-center justify-center">
+                <div className="flex items-center space-x-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span>Cashout request submitted successfully! Processing may take 1-3 business days.</span>
+                </div>
+              </div>
+            )}
+
+            <div className="grid md:grid-cols-2 gap-8">
+              <Card className="modern-card">
+                <CardHeader>
+                  <CardTitle className="gradient-text">Cashout Options</CardTitle>
+                  <CardDescription>Convert your points to real rewards</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleCashoutSubmit} className="space-y-4">
+                    <div>
+                      <Label htmlFor="cashoutMethod">Cashout Method</Label>
+                      <select
+                        id="cashoutMethod"
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        value={cashoutForm.method}
+                        onChange={(e) => setCashoutForm({...cashoutForm, method: e.target.value})}
+                        required
+                      >
+                        <option value="">Select a method</option>
+                        {cashoutMethods.map((method) => (
+                          <option key={method.id} value={method.id}>{method.name} (Min: {method.minAmount})</option>
+                        ))}
+                      </select>
                     </div>
-                    <CardTitle className="text-lg">{reward.name}</CardTitle>
-                    <CardDescription>{reward.description}</CardDescription>
-                    <Badge variant="outline" className="mt-2">
-                      From {reward.minAmount}
-                    </Badge>
+
+                    <div>
+                      <Label htmlFor="amount">Amount in USD</Label>
+                      <Input
+                        id="amount"
+                        type="number"
+                        step="0.01"
+                        min="1"
+                        placeholder="Enter amount in USD"
+                        value={cashoutForm.amount}
+                        onChange={(e) => setCashoutForm({...cashoutForm, amount: e.target.value})}
+                        required
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Minimum: $1.00 (250 pts = $1 + 50 pts fee)
+                      </p>
+                      {cashoutForm.amount && (
+                        <p className="text-sm mt-1">
+                          Total points needed: {(parseFloat(cashoutForm.amount) * 200 + 50).toFixed(0)} pts
+                          (${cashoutForm.amount} × 200 pts + 50 pts fee)
+                        </p>
+                      )}
+                    </div>
+
+                    {cashoutForm.method.includes('amazon') && (
+                      <div>
+                        <Label htmlFor="country">Country</Label>
+                        <select
+                          id="country"
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                          value={cashoutForm.country}
+                          onChange={(e) => setCashoutForm({...cashoutForm, country: e.target.value})}
+                          required
+                        >
+                          <option value="US">United States (Amazon.com)</option>
+                          <option value="UK">United Kingdom (Amazon.co.uk)</option>
+                        </select>
+                      </div>
+                    )}
+
+                    {(cashoutForm.method && cashoutMethods.find(m => m.id === cashoutForm.method)?.fields.includes('email') && (
+                      <div>
+                        <Label htmlFor="email">Email Address</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="Enter your email"
+                          value={cashoutForm.email}
+                          onChange={(e) => setCashoutForm({...cashoutForm, email: e.target.value})}
+                          required
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Gift card will be sent to this email
+                        </p>
+                      </div>
+                    )}
+
+                    {(cashoutForm.method && cashoutMethods.find(m => m.id === cashoutForm.method)?.fields.includes('walletAddress') && (
+                      <div>
+                        <Label htmlFor="walletAddress">LTC Wallet Address</Label>
+                        <Input
+                          id="walletAddress"
+                          type="text"
+                          placeholder="Enter your Litecoin wallet address"
+                          value={cashoutForm.walletAddress}
+                          onChange={(e) => setCashoutForm({...cashoutForm, walletAddress: e.target.value})}
+                          required
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Make sure this address is correct
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="pt-2">
+                      <Button 
+                        type="submit" 
+                        className="w-full btn-premium"
+                        disabled={!cashoutForm.method || !cashoutForm.amount}
+                      >
+                        Request Cashout
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+
+              <div className="space-y-6">
+                <Card className="modern-card">
+                  <CardHeader>
+                    <CardTitle className="gradient-text">Points Conversion</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <Button className="w-full btn-premium">
-                      Redeem Now
-                    </Button>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Conversion Rate</span>
+                        <span className="font-medium">200 pts = $1.00</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Cashout Fee</span>
+                        <span className="font-medium">50 pts per transaction</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Minimum Cashout</span>
+                        <span className="font-medium">250 pts ($1 + 50 pts fee)</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Processing Time</span>
+                        <span className="font-medium">1-3 business days</span>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
-              ))}
+
+                <Card className="modern-card">
+                  <CardHeader>
+                    <CardTitle className="gradient-text">Available Rewards</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-2 gap-4">
+                    {cashoutMethods.map((method) => (
+                      <div 
+                        key={method.id} 
+                        className={`p-4 rounded-lg border ${cashoutForm.method === method.id ? 'border-primary bg-primary/10' : 'border-border'}`}
+                        onClick={() => setCashoutForm({...cashoutForm, method: method.id})}
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className={`p-2 rounded-lg ${cashoutForm.method === method.id ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                            {method.icon}
+                          </div>
+                          <div>
+                            <div className="font-medium">{method.name}</div>
+                            <div className="text-xs text-muted-foreground">Min: {method.minAmount}</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </div>
         )}
@@ -606,10 +857,9 @@ const Index = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm text-muted-foreground">
-                  <p>• Minimum payout: $1.00 for most methods</p>
-                  <p>• Processing time: 1 - 3 BUSINESS DAYS</p>
-                  <p>• Supported: PayPal, Crypto, Gift Cards</p>
-                  <p>• No hidden fees or charges</p>
+                  <p>• Minimum                  <p>• Minimum cashout is $1 or 250 points with a small fee</p>
+                  <p>• Withdrawal times vary depending on method</p>
+                  <p>• Ensure your payment details are correct to avoid delays</p>
                 </CardContent>
               </Card>
             </div>
@@ -617,43 +867,12 @@ const Index = () => {
         )}
       </main>
 
-      {/* Mobile Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card/90 backdrop-blur-xl border-t border-border">
-        <div className="grid grid-cols-6 gap-1 p-2">
-          {[
-            { id: 'home', icon: Home },
-            { id: 'earn', icon: Target },
-            { id: 'shop', icon: ShoppingBag },
-            { id: 'leaderboard', icon: Trophy },
-            { id: 'profile', icon: User },
-            { id: 'help', icon: HelpCircle }
-          ].map((item) => {
-            const IconComponent = item.icon;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`flex flex-col items-center justify-center p-3 rounded-lg transition-all ${
-                  activeTab === item.id
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <IconComponent className="w-5 h-5" />
-                <span className="text-xs mt-1 capitalize">{item.id}</span>
-              </button>
-            );
-          })}
-        </div>
-      </nav>
+      {/* Iframe Modal for Offerwalls */}
+      {isIframeOpen && (
+        <IframeModal url={iframeUrl} onClose={closeIframe} />
+      )}
 
-      <div className="h-20 md:h-0" />
-      
-      <IframeModal 
-        isOpen={isIframeOpen} 
-        url={iframeUrl} 
-        onClose={closeIframe} 
-      />
+      {/* Notifications or other components can be added here */}
     </div>
   );
 };
