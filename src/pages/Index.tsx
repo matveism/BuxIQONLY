@@ -879,36 +879,32 @@ const Index = () => {
               <p className="text-muted-foreground mb-8">Redeem your earnings for amazing rewards</p>
             </div>
 
-            <div className="grid md:grid-cols-2 lg:            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {rewards.map((reward) => (
-                <Card key={reward.id} className="modern-card hover-lift group">
-                  <CardHeader>
-                    <div className="flex items-center justify-center mb-4">
-                      {reward.icon}
-                    </div>
-                    <CardTitle className="text-lg">{reward.name}</CardTitle>
-                    <CardDescription>{reward.minAmount}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Button
-                      className={`w-full bg-gradient-to-r ${reward.color} hover:scale-105 transition-all`}
-                      onClick={() => {
-                        // Open a modal or sheet for reward redemption
-                        // For simplicity, prompt user to confirm
-                        if (window.confirm(`Redeem ${reward.minAmount} for ${reward.name}?`)) {
-                          // Implement redemption logic here
-                          toast.success(`Redemption for ${reward.name} initiated!`);
-                        }
-                      }}
-                    >
-                      Redeem
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+  {rewards.map((reward) => (
+    <Card key={reward.id} className="modern-card hover-lift group">
+      <CardHeader>
+        <div className="flex items-center justify-center mb-4">
+          {reward.icon}
+        </div>
+        <CardTitle className="text-lg">{reward.name}</CardTitle>
+        <CardDescription>{reward.minAmount}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Button
+          className={`w-full bg-gradient-to-r ${reward.color} hover:scale-105 transition-all`}
+          onClick={() => {
+            if (window.confirm(`Redeem ${reward.minAmount} for ${reward.name}?`)) {
+              toast.success(`Redemption for ${reward.name} initiated!`);
+            }
+          }}
+        >
+          Redeem
+        </Button>
+      </CardContent>
+    </Card>
+  ))}
+</div>
+      
 
         {/* Profile Tab */}
         {activeTab === 'profile' && (
