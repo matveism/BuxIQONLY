@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bux iQ - Premium Crypto Rewards Platform</title>
+    <meta name="description" content="Earn cryptocurrency, PayPal cash, and premium gift cards through surveys, offers, and games. Professional rewards platform with instant payouts." />
+    <meta name="author" content="Bux iQ" />
+    <meta name="theme-color" content="#8b5cf6" />
+
+    <!-- Open Graph / Social Media Meta Tags -->
+    <meta property="og:title" content="Bux iQ - Premium Crypto Rewards Platform" />
+    <meta property="og:description" content="Earn cryptocurrency, PayPal cash, and premium gift cards through surveys, offers, and games." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <meta property="og:url" content="https://yourdomain.com" />
+
+    <!-- Twitter Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@lovable_dev" />
+    <meta name="twitter:creator" content="@lovable_dev" />
+    <meta name="twitter:title" content="Bux iQ - Premium Crypto Rewards Platform" />
+    <meta name="twitter:description" content="Earn cryptocurrency, PayPal cash, and premium gift cards through surveys, offers, and games." />
+    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="https://i.imgur.com/wppiqAy.png" />
+    <link rel="apple-touch-icon" href="https://i.imgur.com/wppiqAy.png" />
+
+    <!-- Preconnect and Preload -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://accounts.google.com">
+    <link rel="preconnect" href="https://discord.com">
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- OAuth and Utility Scripts -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://unpkg.com/jwt-decode@3.1.2/build/jwt-decode.min.js"></script>
+    <script src="https://unpkg.com/sonner@1.4.1/dist/sonner.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@react-oauth/discord@1.0.0/dist/index.umd.js"></script>
+
+    <!-- Performance Optimization -->
+    <link rel="preload" as="script" href="/src/main.tsx">
+    
+    <!-- Initial State for Toast Notifications -->
+    <script>
+      window.Toast = Sonner.Toast;
+      window.Toast.setDefaultOptions({ 
+        position: 'top-center',
+        duration: 5000
+      });
+    </script>
+    
+    <!-- PWA Configuration (optional) -->
+    <link rel="manifest" href="/manifest.json">
+  </head>
+
+  <body>
+    <div id="root"></div>
+    
+    <!-- Loading Animation -->
+    <div id="loading-screen" style="position:fixed;top:0;left:0;width:100%;height:100%;background:#0f172a;display:flex;justify-content:center;align-items:center;z-index:9999;">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:1rem;">
+        <div style="width:60px;height:60px;border:5px solid #8b5cf6;border-radius:50%;border-top-color:transparent;animation:spin 1s linear infinite;"></div>
+        <p style="color:white;font-family:Inter,sans-serif;">Loading Bux iQ...</p>
+      </div>
+    </div>
+    
+    <script type="module" src="/src/main.tsx"></script>
+    
+    <script>
+      // Remove loading screen when app is mounted
+      window.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => {
+          const loadingScreen = document.getElementById('loading-screen');
+          if (loadingScreen) {
+            loadingScreen.style.opacity = '0';
+            setTimeout(() => loadingScreen.remove(), 300);
+          }
+        }, 1000);
+      });
+      
+      // Animation for loading spinner
+      const style = document.createElement('style');
+      style.textContent = `
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `;
+      document.head.appendChild(style);
+    </script>
+  </body>
+</html>
