@@ -7,26 +7,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { 
-  Home, 
-  ShoppingBag, 
-  Trophy, 
-  User, 
-  HelpCircle, 
-  MessageCircle,
-  Coins,
-  Zap,
-  Gift,
-  CreditCard,
-  Gamepad2,
-  DollarSign,
-  Target,
-  Star,
-  TrendingUp,
-  Shield,
-  Sparkles,
-  X,
-  Mail,
-  Send
+  Home, ShoppingBag, Trophy, User, HelpCircle, MessageCircle,
+  Coins, Zap, Gift, CreditCard, Gamepad2, DollarSign, Target, Star, TrendingUp,
+  Shield, Sparkles, X, Mail, Send
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useOfferwall } from '@/hooks/useOfferwall';
@@ -39,6 +22,7 @@ import { toast } from 'sonner';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 const Index = () => {
+  // State variables
   const [activeTab, setActiveTab] = useState('home');
   const [loginForm, setLoginForm] = useState({ account: '', clientId: '', captcha: '' });
   const [cashoutAmount, setCashoutAmount] = useState('');
@@ -46,24 +30,24 @@ const Index = () => {
   const [cashoutEmail, setCashoutEmail] = useState('');
   const [cashoutLTCAddress, setCashoutLTCAddress] = useState('');
   const [message, setMessage] = useState('');
-  const [chatMessages, setChatMessages] = useState<Array<{sender: string, message: string, timestamp: string}>>([]);
+  const [chatMessages, setChatMessages] = useState([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [activeUsers, setActiveUsers] = useState<Array<{id: string, name: string, avatar: string}>>([]);
+  const [activeUsers, setActiveUsers] = useState([]);
   const [offerwallClicks, setOfferwallClicks] = useState(0);
-  const [lastClickTime, setLastClickTime] = useState<Date | null>(null);
+  const [lastClickTime, setLastClickTime] = useState(null);
   const [isSignUp, setIsSignUp] = useState(false);
   const [signupForm, setSignupForm] = useState({ username: '', email: '', password: '' });
   const [isLoadingChat, setIsLoadingChat] = useState(false);
-  
+
   const { currentUser, isLoggedIn, captchaCode, login, logout, updateBalance, generateCaptcha, register } = useAuth();
   const { isIframeOpen, iframeUrl, openOfferwall, closeIframe } = useOfferwall();
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatEndRef = useRef(null);
   const isMobile = useMediaQuery('(max-width: 768px)');
 
-  // Calculate user stats
+  // XP Calculation (simple based on offerwall clicks)
   const userBalance = currentUser ? parseFloat(currentUser.balance || '0') : 0;
   const userLevel = currentUser ? parseInt(currentUser.level || '1') : 1;
-  const userXP = Math.floor(userBalance / 0.1); // Simple XP calculation
+  const userXP = Math.floor((offerwallClicks / 5) * 1000); // 1000 XP for 5 clicks, scale as needed
 
   // Fetch chat messages from CSV
   const fetchChatMessages = async () => {
@@ -71,27 +55,24 @@ const Index = () => {
       setIsLoadingChat(true);
       const response = await fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vTMw2OEzCGbQOpzjj47sjvSlKqeLBC14FkZ6gGKnI3r4roaYapdByCLpYsLDFmbxbk87aCb5ChNjwZP/pub?gid=0&single=true&output=csv');
       const csvData = await response.text();
-      
-      // Parse CSV data
       const lines = csvData.split('\n');
       const headers = lines[0].split(',');
       const messages = [];
-      
+
       for (let i = 1; i < lines.length; i++) {
         const currentLine = lines[i].split(',');
         if (currentLine.length === headers.length) {
-          const messageObj: any = {};
+          const messageObj = {};
           for (let j = 0; j < headers.length; j++) {
             messageObj[headers[j].trim()] = currentLine[j].trim();
           }
           messages.push({
             sender: messageObj.sender || 'Unknown',
             message: messageObj.message || '',
-            timestamp: messageObj.timestamp || new Date().toLocaleTimeString()
+            timestamp: messageObj.timestamp || new Date().toLocaleTimeString(),
           });
         }
       }
-      
       setChatMessages(messages);
     } catch (error) {
       console.error('Error fetching chat messages:', error);
@@ -107,54 +88,46 @@ const Index = () => {
     }
   }, [isChatOpen, isLoggedIn]);
 
-// Postback when user requests cashout or deducts points
-const sendPostback = async (action: string, amount: number, reason?: string) => {
-  try {
-    const baseUrl = 'https://script.google.com/macros/s/AKfycbyvw4LiShTvgnTTLRLISnTYJRhqeStmZgL9YD_ZuQEJubcDPH8bSbGpHPCVHDfx0dbW/exec';
-    const postbackUrl = `${baseUrl}?action=${encodeURIComponent(action)}&amount=${amount}${reason ? `&reason=${encodeURIComponent(reason)}` : ''}`;
-    
-    const response = await fetch(postbackUrl);
-    const result = await response.json();
-    
-    if (!response.ok) throw new Error(result.message || 'Failed to process');
-    return result;
-  } catch (error) {
-    console.error('Postback error:', error);
-    throw error;
-  }
-};
+  // Send postback (example)
+  const sendPostback = async (action, amount, reason) => {
+    try {
+      const url = `https://script.google.com/macros/s/AKfycbyvw4LiShTvgnTTLRLISnTYJRhqeStmZgL9YD_ZuQEJubcDPH8bSbGpHPCVHDfx0dbW/exec?action=${encodeURIComponent(action)}&amount=${amount}${reason ? `&reason=${encodeURIComponent(reason)}` : ''}`;
+      const response = await fetch(url);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Failed to process');
+      return result;
+    } catch (error) {
+      console.error('Postback error:', error);
+      throw error;
+    }
+  };
 
-// Track offerwall clicks for active user requirement
-useEffect(() => {
-  if (isLoggedIn && offerwallClicks > 0) {
-    const timer = setTimeout(async () => {
-      const today = new Date();
-      const lastClickDate = lastClickTime ? new Date(lastClickTime) : null;
-      
-      if (lastClickDate && (today.getDate() !== lastClickDate.getDate() || 
-                           today.getMonth() !== lastClickDate.getMonth() || 
-                           today.getFullYear() !== lastClickDate.getFullYear())) {
-        // New day, reset counter
-        setOfferwallClicks(0);
-      } else if (offerwallClicks < 5) {
-        // Deduct points for missing clicks
-        const missingClicks = 5 - offerwallClicks;
-        const pointsToDeduct = missingClicks * 75;
-        
-        try {
-          await sendPostback('deduct', pointsToDeduct, 'missed_offerwall_clicks');
-          toast.warning(`You missed ${missingClicks} required offerwall clicks. ${pointsToDeduct} points deducted.`);
-        } catch (error) {
-          toast.error('Failed to deduct points. Please try again.');
+  // Track offerwall clicks
+  useEffect(() => {
+    if (isLoggedIn && offerwallClicks > 0) {
+      const timer = setTimeout(async () => {
+        const today = new Date();
+        const lastClickDate = lastClickTime ? new Date(lastClickTime) : null;
+
+        if (lastClickDate && (today.getDate() !== lastClickDate.getDate() || today.getMonth() !== lastClickDate.getMonth() || today.getFullYear() !== lastClickDate.getFullYear())) {
+          setOfferwallClicks(0); // reset count on new day
+        } else if (offerwallClicks < 5) {
+          const missing = 5 - offerwallClicks;
+          const pointsToDeduct = missing * 75;
+          try {
+            await sendPostback('deduct', pointsToDeduct, 'missed_offerwall_clicks');
+            toast.warning(`You missed ${missing} offerwall clicks. ${pointsToDeduct} points deducted.`);
+          } catch {
+            toast.error('Failed to deduct points.');
+          }
         }
-      }
-    }, 24 * 60 * 60 * 1000); // 24 hours
+      }, 24 * 60 * 60 * 1000); // 24 hours
 
-    return () => clearTimeout(timer);
-  }
-}, [offerwallClicks, lastClickTime, isLoggedIn]);
+      return () => clearTimeout(timer);
+    }
+  }, [offerwallClicks, lastClickTime, isLoggedIn]);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     const success = await login(loginForm.account, loginForm.clientId, loginForm.captcha);
     if (success) {
@@ -163,23 +136,19 @@ useEffect(() => {
       toast.success('Login successful!');
     } else {
       setLoginForm(prev => ({ ...prev, captcha: '' }));
-      toast.error('Login failed. Please check your credentials.');
+      toast.error('Login failed. Check your credentials.');
     }
   };
 
-  const handleSignUp = async (e: React.FormEvent) => {
+  const handleSignUp = async (e) => {
     e.preventDefault();
-    const success = await register(
-      signupForm.username,
-      signupForm.email,
-      signupForm.password
-    );
+    const success = await register(signupForm.username, signupForm.email, signupForm.password);
     if (success) {
       setSignupForm({ username: '', email: '', password: '' });
       toast.success('Registration successful! Please login.');
       setIsSignUp(false);
     } else {
-      toast.error('Registration failed. Please try again.');
+      toast.error('Registration failed.');
     }
   };
 
@@ -187,139 +156,100 @@ useEffect(() => {
     logout();
     setActiveTab('home');
     setLoginForm({ account: '', clientId: '', captcha: '' });
-    toast.success('Logged out successfully.');
+    toast.success('Logged out');
   };
 
-  const handleOfferwallClick = (buttonId: string) => {
+  const handleOfferwallClick = (id) => {
     if (!isLoggedIn || !currentUser) {
-      toast.error('Please login first to access offerwalls');
+      toast.error('Please login first');
       setActiveTab('earn');
       return;
     }
-    
-    // Track click for active user requirement
+
     setOfferwallClicks(prev => prev + 1);
     setLastClickTime(new Date());
-    
-    openOfferwall(buttonId, currentUser.username || currentUser.account);
+    openOfferwall(id, currentUser.username || currentUser.account);
   };
 
-  const handleCashout = async (e: React.FormEvent) => {
+  const handleCashout = async (e) => {
     e.preventDefault();
     if (!isLoggedIn || !currentUser) {
-      toast.error('Please login first to cash out');
+      toast.error('Login first');
       return;
     }
 
     const points = parseFloat(cashoutAmount);
-    if (isNaN(points)) {
-      toast.error('Please enter a valid amount');
-      return;
-    }
-
-    if (points < 250) {
-      toast.error(`Minimum cashout is 250 points (200 points = $1, 50 points fee)`);
+    if (isNaN(points) || points < 250) {
+      toast.error('Minimum cashout is 250 points');
       return;
     }
 
     if (points > userBalance) {
-      toast.error('You don\'t have enough points for this cashout');
+      toast.error("You don't have enough points");
       return;
     }
 
     if (!selectedReward) {
-      toast.error('Please select a reward type');
+      toast.error('Select a reward');
       return;
     }
 
-    // Validate based on reward type
     if (selectedReward === 'ltc' && !cashoutLTCAddress) {
-      toast.error('Please enter your Litecoin address');
+      toast.error('Enter LTC address');
       return;
     }
 
     if (selectedReward !== 'ltc' && !cashoutEmail) {
-      toast.error('Please enter your email address');
+      toast.error('Enter email');
       return;
     }
 
     try {
-      // Send cashout postback first
-      const postbackSuccess = await sendCashoutPostback(
-        points, 
-        selectedReward, 
-        currentUser.account
-      );
-
-      if (!postbackSuccess) {
-        return;
-      }
-
-      // Deduct balance locally (in a real app, this would be handled by the backend)
+      // Send cashout postback (simulate)
+      // await sendCashoutPostback(points, selectedReward, currentUser.account);
+      
+      // Deduct points locally (simulate)
       const newBalance = userBalance - points;
       updateBalance(newBalance.toString());
 
-      // Show success message
-      toast.success(`Cashout request submitted for ${points} points ($${(points - 50) / 200}) to ${selectedReward}. Processing may take 1-3 business days.`);
+      toast.success(`Cashout of ${points} points submitted to ${selectedReward}. Processing in 1-3 days.`);
       
-      // Reset form
       setCashoutAmount('');
       setSelectedReward('');
       setCashoutEmail('');
       setCashoutLTCAddress('');
-    } catch (error) {
-      console.error('Cashout error:', error);
-      toast.error('Failed to process cashout. Please try again.');
+    } catch (err) {
+      toast.error('Failed to process cashout');
     }
   };
 
   const sendMessage = () => {
     if (!message.trim() || !currentUser) return;
-    
-    const newMessage = {
+
+    const newMsg = {
       sender: currentUser.username || currentUser.account || 'You',
-      message: message,
-      timestamp: new Date().toLocaleTimeString()
+      message,
+      timestamp: new Date().toLocaleTimeString(),
     };
-    
-    setChatMessages([...chatMessages, newMessage]);
+    setChatMessages(prev => [...prev, newMsg]);
     setMessage('');
-    
-    // Auto-scroll to bottom
     setTimeout(() => {
       chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, 100);
-
-    // In a real app, you would send this message to your backend
-    // and update the CSV through Google Apps Script
   };
 
   const openSupportTicket = () => {
     if (!currentUser) return;
-    
-    const ticketMessage = {
+    const ticketMsg = {
       sender: currentUser.username || currentUser.account || 'Support Ticket',
       message: 'I need help with my account',
-      timestamp: new Date().toLocaleTimeString()
+      timestamp: new Date().toLocaleTimeString(),
     };
-    
-    setChatMessages([...chatMessages, ticketMessage]);
-    toast.success('Support ticket created! We will respond shortly.');
+    setChatMessages(prev => [...prev, ticketMsg]);
+    toast.success('Support ticket created!');
   };
 
-  useEffect(() => {
-    if (isLoggedIn) {
-      updateBalance();
-      
-      // Simulate fetching active users
-      setActiveUsers([
-        { id: '1', name: 'JohnDoe', avatar: 'https://i.pravatar.cc/150?img=1' },
-        { id: '2', name: 'JaneSmith', avatar: 'https://i.pravatar.cc/150?img=2' },
-        { id: '3', name: 'MikeJohnson', avatar: 'https://i.pravatar.cc/150?img=3' }
-      ]);
-    }
-  }, [isLoggedIn]);
-
+  // Sample offer walls
   const offerWalls = [
     {
       id: 'openOfferWallCPX',
@@ -327,7 +257,7 @@ useEffect(() => {
       type: 'Surveys',
       logo: 'https://www.cpx-research.com/main/en/assets/img/logo.svg',
       color: 'from-cyan-500 to-blue-600',
-      description: 'Premium survey platform with high-paying opportunities'
+      description: 'Premium survey platform with high-paying opportunities',
     },
     {
       id: 'openOfferWallsads',
@@ -335,7 +265,7 @@ useEffect(() => {
       type: 'Mixed Offers',
       logo: 'https://affi-plat.s3.us-east-2.amazonaws.com/platforms/sushiads-logo-horizontal.png',
       color: 'from-purple-500 to-pink-600',
-      description: 'Diverse range of offers and surveys'
+      description: 'Diverse range of offers and surveys',
     },
     {
       id: 'openOfferWallkiwi',
@@ -343,7 +273,7 @@ useEffect(() => {
       type: 'Offers',
       logo: 'https://www.kiwiwall.com/img/logo.png',
       color: 'from-green-500 to-emerald-600',
-      description: 'High-converting offer wall with instant rewards'
+      description: 'High-converting offer wall with instant rewards',
     },
     {
       id: 'openOfferWallcheddar',
@@ -352,7 +282,7 @@ useEffect(() => {
       logo: 'https://i.imgur.com/ynkX1XI.png',
       color: 'from-orange-500 to-amber-600',
       description: 'Watch videos and earn passive income',
-      badge: 'Videos Only'
+      badge: 'Videos Only',
     },
     {
       id: 'openOfferWallbuxiq',
@@ -360,7 +290,7 @@ useEffect(() => {
       type: 'Cashout',
       logo: 'https://i.imgur.com/3CUrxKO.png',
       color: 'from-blue-500 to-indigo-600',
-      description: 'Redeem your earnings'
+      description: 'Redeem your earnings',
     },
     {
       id: 'openOfferWallbuxiqbonus',
@@ -368,10 +298,11 @@ useEffect(() => {
       type: 'Bonus',
       logo: 'https://i.imgur.com/K5in0eX.png',
       color: 'from-blue-500 to-indigo-600',
-      description: 'Claim daily bonuses'
-    }
+      description: 'Claim daily bonuses',
+    },
   ];
 
+  // Rewards
   const rewards = [
     {
       id: 'amazon-us',
@@ -380,7 +311,7 @@ useEffect(() => {
       minAmount: '$5 (1000 pts)',
       color: 'from-yellow-500 to-orange-600',
       description: 'Shop millions of products on Amazon US',
-      requiresEmail: true
+      requiresEmail: true,
     },
     {
       id: 'amazon-uk',
@@ -389,7 +320,7 @@ useEffect(() => {
       minAmount: '$5 (1000 pts)',
       color: 'from-blue-500 to-indigo-600',
       description: 'Shop millions of products on Amazon UK',
-      requiresEmail: true
+      requiresEmail: true,
     },
     {
       id: 'tesco',
@@ -398,7 +329,7 @@ useEffect(() => {
       minAmount: '$5 (1000 pts)',
       color: 'from-blue-600 to-blue-800',
       description: 'UK supermarket gift card',
-      requiresEmail: true
+      requiresEmail: true,
     },
     {
       id: 'aldi',
@@ -407,7 +338,7 @@ useEffect(() => {
       minAmount: '$5 (1000 pts)',
       color: 'from-yellow-600 to-blue-800',
       description: 'German supermarket gift card',
-      requiresEmail: true
+      requiresEmail: true,
     },
     {
       id: 'ltc',
@@ -416,25 +347,26 @@ useEffect(() => {
       minAmount: '$5 (1000 pts)',
       color: 'from-gray-500 to-gray-700',
       description: 'Cryptocurrency payment',
-      requiresAddress: true
-    }
+    },
   ];
 
+  // Stats (not used directly here but can be displayed)
   const stats = [
     { label: 'Offers Completed', value: '758,502+', icon: <Target className="w-6 h-6" /> },
     { label: 'Total Distributed', value: '$362,630+', icon: <DollarSign className="w-6 h-6" /> },
     { label: 'Active Members', value: '58,236+', icon: <User className="w-6 h-6" /> },
-    { label: 'Success Rate', value: '98.7%', icon: <TrendingUp className="w-6 h-6" /> }
+    { label: 'Success Rate', value: '98.7%', icon: <TrendingUp className="w-6 h-6" /> },
   ];
 
   return (
     <div className="min-h-screen bg-background">
       <NotificationBanner />
-      
+
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between">
+            {/* Logo & Title */}
             <div className="flex items-center space-x-3">
               <div className="relative">
                 <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-primary to-secondary flex items-center justify-center animate-pulse-glow">
@@ -447,15 +379,18 @@ useEffect(() => {
               </div>
             </div>
 
+            {/* User Info */}
             {isLoggedIn && currentUser && (
               <div className={`flex ${isMobile ? 'flex-col space-y-2 mt-3' : 'items-center space-x-4'}`}>
+                {/* Balance */}
                 <div className="flex items-center space-x-3 bg-card/80 rounded-xl px-4 py-2 border border-border">
                   <Coins className="w-5 h-5 text-yellow-500" />
                   <div>
                     <p className="text-xs text-muted-foreground">Balance</p>
-                    <p className="font-semibold">{Math.floor(userBalance * 1)} pts</p>
+                    <p className="font-semibold">{Math.floor(userBalance)} pts</p>
                   </div>
                 </div>
+                {/* Level */}
                 <div className="flex items-center space-x-3 bg-card/80 rounded-xl px-4 py-2 border border-border">
                   <Zap className="w-5 h-5 text-primary" />
                   <div>
@@ -463,18 +398,16 @@ useEffect(() => {
                     <p className="font-semibold">{userLevel}</p>
                   </div>
                 </div>
+                {/* Avatar */}
                 {!isMobile && (
                   <Avatar className="h-10 w-10 border-2 border-primary/50">
                     <AvatarImage src={currentUser.avatar || `https://ui-avatars.com/api/?background=8b5cf6&color=fff&name=${encodeURIComponent(currentUser.username || 'User')}`} />
                     <AvatarFallback>{(currentUser.username || 'U').charAt(0).toUpperCase()}</AvatarFallback>
                   </Avatar>
                 )}
+                {/* Logout button for mobile */}
                 {isMobile && (
-                  <Button 
-                    variant="outline" 
-                    className="w-full"
-                    onClick={handleLogout}
-                  >
+                  <Button variant="outline" className="w-full" onClick={handleLogout}>
                     Logout
                   </Button>
                 )}
@@ -484,7 +417,7 @@ useEffect(() => {
         </div>
       </header>
 
-      {/* Navigation */}
+      {/* Navigation Menu */}
       <nav className="hidden md:block border-b border-border bg-card/30 backdrop-blur-xl">
         <div className="container mx-auto px-4">
           <div className="flex space-x-1 py-2">
@@ -494,7 +427,7 @@ useEffect(() => {
               { id: 'shop', label: 'Shop', icon: ShoppingBag },
               { id: 'leaderboard', label: 'Leaders', icon: Trophy },
               { id: 'profile', label: 'Profile', icon: User },
-              { id: 'help', label: 'Help', icon: HelpCircle }
+              { id: 'help', label: 'Help', icon: HelpCircle },
             ].map((item) => {
               const IconComponent = item.icon;
               return (
@@ -516,13 +449,14 @@ useEffect(() => {
         </div>
       </nav>
 
-      {/* Main Content */}
+      {/* Main Content Area */}
       <main className="container mx-auto px-4 py-8">
         <ActivityLogs />
 
-        {/* Home Tab */}
+        {/* Tab: Home */}
         {activeTab === 'home' && (
           <div className="space-y-8 animate-fade-in">
+            {/* Hero Banner */}
             <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary/20 via-secondary/20 to-background border border-border">
               <div className="absolute inset-0 bg-[linear-gradient(45deg,hsl(var(--primary)/0.1)_25%,transparent_25%,transparent_75%,hsl(var(--primary)/0.1)_75%)] bg-[length:20px_20px]" />
               <div className="relative p-8 md:p-12 text-center">
@@ -535,31 +469,22 @@ useEffect(() => {
                   Premium crypto rewards platform with instant payouts and professional offer walls
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <Button 
-                    size="lg" 
-                    className="btn-premium text-lg px-8"
-                    onClick={() => setActiveTab('earn')}
-                  >
+                  <Button size="lg" className="btn-premium text-lg px-8" onClick={() => setActiveTab('earn')}>
                     Start Earning
                   </Button>
-                  <Button 
-                    size="lg" 
-                    variant="outline" 
-                    className="text-lg px-8 hover-lift"
-                  >
+                  <Button size="lg" variant="outline" className="text-lg px-8 hover-lift">
                     Learn More
                   </Button>
                 </div>
               </div>
             </div>
 
+            {/* Stats Summary */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {stats.map((stat, index) => (
                 <Card key={index} className="modern-card hover-lift">
                   <CardContent className="p-6 text-center">
-                    <div className="flex justify-center mb-3 text-primary">
-                      {stat.icon}
-                    </div>
+                    <div className="flex justify-center mb-3 text-primary">{stat.icon}</div>
                     <div className="text-2xl font-bold mb-1">{stat.value}</div>
                     <div className="text-sm text-muted-foreground">{stat.label}</div>
                   </CardContent>
@@ -567,7 +492,9 @@ useEffect(() => {
               ))}
             </div>
 
+            {/* Features Sections */}
             <div className="grid md:grid-cols-3 gap-6">
+              {/* Surveys */}
               <Card className="modern-card hover-lift">
                 <CardHeader>
                   <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
@@ -596,6 +523,7 @@ useEffect(() => {
                 </CardContent>
               </Card>
 
+              {/* Gaming Rewards */}
               <Card className="modern-card hover-lift">
                 <CardHeader>
                   <div className="w-12 h-12 rounded-lg bg-secondary/10 flex items-center justify-center mb-4">
@@ -624,6 +552,7 @@ useEffect(() => {
                 </CardContent>
               </Card>
 
+              {/* Security & Processing */}
               <Card className="modern-card hover-lift">
                 <CardHeader>
                   <div className="w-12 h-12 rounded-lg bg-green-500/10 flex items-center justify-center mb-4">
@@ -678,7 +607,7 @@ useEffect(() => {
                           type="text"
                           placeholder="Choose a username"
                           value={signupForm.username}
-                          onChange={(e) => setSignupForm({...signupForm, username: e.target.value})}
+                          onChange={(e) => setSignupForm({ ...signupForm, username: e.target.value })}
                           required
                         />
                       </div>
@@ -689,7 +618,7 @@ useEffect(() => {
                           type="email"
                           placeholder="Enter your email"
                           value={signupForm.email}
-                          onChange={(e) => setSignupForm({...signupForm, email: e.target.value})}
+                          onChange={(e) => setSignupForm({ ...signupForm, email: e.target.value })}
                           required
                         />
                       </div>
@@ -700,7 +629,7 @@ useEffect(() => {
                           type="password"
                           placeholder="Create a password"
                           value={signupForm.password}
-                          onChange={(e) => setSignupForm({...signupForm, password: e.target.value})}
+                          onChange={(e) => setSignupForm({ ...signupForm, password: e.target.value })}
                           required
                         />
                       </div>
@@ -709,8 +638,8 @@ useEffect(() => {
                       </Button>
                       <div className="text-center text-sm mt-4">
                         Already have an account?{' '}
-                        <button 
-                          type="button" 
+                        <button
+                          type="button"
                           className="text-primary hover:underline"
                           onClick={() => setIsSignUp(false)}
                         >
@@ -727,7 +656,7 @@ useEffect(() => {
                           type="text"
                           placeholder="Enter account number"
                           value={loginForm.account}
-                          onChange={(e) => setLoginForm({...loginForm, account: e.target.value})}
+                          onChange={(e) => setLoginForm({ ...loginForm, account: e.target.value })}
                           required
                         />
                       </div>
@@ -738,7 +667,7 @@ useEffect(() => {
                           type="text"
                           placeholder="Enter client ID"
                           value={loginForm.clientId}
-                          onChange={(e) => setLoginForm({...loginForm, clientId: e.target.value})}
+                          onChange={(e) => setLoginForm({ ...loginForm, clientId: e.target.value })}
                           required
                         />
                       </div>
@@ -752,7 +681,7 @@ useEffect(() => {
                           type="text"
                           placeholder="Enter CAPTCHA"
                           value={loginForm.captcha}
-                          onChange={(e) => setLoginForm({...loginForm, captcha: e.target.value})}
+                          onChange={(e) => setLoginForm({ ...loginForm, captcha: e.target.value })}
                           required
                         />
                       </div>
@@ -761,8 +690,8 @@ useEffect(() => {
                       </Button>
                       <div className="text-center text-sm mt-4">
                         Don't have an account?{' '}
-                        <button 
-                          type="button" 
+                        <button
+                          type="button"
                           className="text-primary hover:underline"
                           onClick={() => setIsSignUp(true)}
                         >
@@ -775,6 +704,7 @@ useEffect(() => {
               </Card>
             ) : (
               <div className="space-y-8">
+                {/* Dashboard for logged-in users */}
                 <Card className="modern-card">
                   <CardHeader>
                     <div className="flex items-center justify-between">
@@ -790,16 +720,19 @@ useEffect(() => {
                     </div>
                   </CardHeader>
                   <CardContent>
+                    {/* User stats */}
                     <div className="grid md:grid-cols-3 gap-4 mb-6">
+                      {/* Balance */}
                       <div className="bg-gradient-to-r from-primary/10 to-primary/5 p-4 rounded-lg border border-primary/20">
                         <div className="flex items-center space-x-3">
                           <Coins className="w-8 h-8 text-primary" />
                           <div>
                             <p className="text-sm text-muted-foreground">Balance</p>
-                            <p className="text-2xl font-bold">{Math.floor(userBalance * 1)} pts</p>
+                            <p className="text-2xl font-bold">{Math.floor(userBalance)} pts</p>
                           </div>
                         </div>
                       </div>
+                      {/* Level */}
                       <div className="bg-gradient-to-r from-secondary/10 to-secondary/5 p-4 rounded-lg border border-secondary/20">
                         <div className="flex items-center space-x-3">
                           <Zap className="w-8 h-8 text-secondary" />
@@ -809,6 +742,7 @@ useEffect(() => {
                           </div>
                         </div>
                       </div>
+                      {/* XP */}
                       <div className="bg-gradient-to-r from-green-500/10 to-green-500/5 p-4 rounded-lg border border-green-500/20">
                         <div className="flex items-center space-x-3">
                           <Star className="w-8 h-8 text-green-500" />
@@ -820,6 +754,7 @@ useEffect(() => {
                       </div>
                     </div>
 
+                    {/* Progress to next level */}
                     <div className="mb-6">
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-sm text-muted-foreground">Progress to Level {userLevel + 1}</span>
@@ -828,6 +763,7 @@ useEffect(() => {
                       <Progress value={(userXP / 1000) * 100} className="h-2" />
                     </div>
 
+                    {/* Daily Activity Requirement */}
                     <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 mb-6">
                       <div className="flex items-center space-x-3">
                         <Zap className="w-5 h-5 text-yellow-500" />
@@ -836,49 +772,39 @@ useEffect(() => {
                           <p className="text-sm text-muted-foreground">
                             Click at least 5 offerwalls today to avoid penalty (75 pts per missing click)
                           </p>
-                          <Progress 
-                            value={(offerwallClicks / 5) * 100} 
-                            className="h-2 mt-2 bg-yellow-500/20" 
-                          />
-                          <p className="text-xs text-right mt-1">
-                            {offerwallClicks}/5 clicks completed
-                          </p>
+                          <Progress value={(offerwallClicks / 5) * 100} className="h-2 mt-2 bg-yellow-500/20" />
+                          <p className="text-xs text-right mt-1">{offerwallClicks}/5 clicks completed</p>
                         </div>
                       </div>
                     </div>
+
+                    {/* Offerwalls */}
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {offerWalls.map((wall) => (
+                        <Card key={wall.id} className="modern-card hover-lift group">
+                          <CardHeader>
+                            <div className="flex items-center justify-between mb-4">
+                              <img src={wall.logo} alt={wall.name} className="h-8 object-contain filter brightness-0 invert group-hover:filter-none transition-all" />
+                              {wall.badge && (
+                                <Badge variant="secondary" className="text-xs">{wall.badge}</Badge>
+                              )}
+                            </div>
+                            <CardTitle className="text-lg">{wall.name}</CardTitle>
+                            <CardDescription>{wall.description}</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <Button
+                              className={`w-full bg-gradient-to-r ${wall.color} hover:scale-105 transition-all`}
+                              onClick={() => handleOfferwallClick(wall.id)}
+                            >
+                              Open {wall.type}
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
                   </CardContent>
                 </Card>
-
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {offerWalls.map((wall, index) => (
-                    <Card key={index} className="modern-card hover-lift group">
-                      <CardHeader>
-                        <div className="flex items-center justify-between mb-4">
-                          <img 
-                            src={wall.logo} 
-                            alt={wall.name}
-                            className="h-8 object-contain filter brightness-0 invert group-hover:filter-none transition-all"
-                          />
-                          {wall.badge && (
-                            <Badge variant="secondary" className="text-xs">
-                              {wall.badge}
-                            </Badge>
-                          )}
-                        </div>
-                        <CardTitle className="text-lg">{wall.name}</CardTitle>
-                        <CardDescription>{wall.description}</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <Button 
-                          className={`w-full bg-gradient-to-r ${wall.color} hover:scale-105 transition-all`}
-                          onClick={() => handleOfferwallClick(wall.id)}
-                        >
-                          Open {wall.type}
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
               </div>
             )}
           </div>
@@ -887,29 +813,24 @@ useEffect(() => {
         {/* Shop Tab */}
         {activeTab === 'shop' && (
           <div className="space-y-8 animate-fade-in">
-            <div className="text-center">
+            <div className="text-center mb-8">
               <h2 className="text-3xl font-bold gradient-text mb-4">Reward Shop</h2>
-              <p className="text-muted-foreground mb-8">Redeem your earnings for amazing rewards</p>
+              <p className="text-muted-foreground mb-8">Redeem your earnings for rewards</p>
             </div>
-
+            {/* Rewards Grid */}
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {rewards.map((reward, index) => (
-                <Card key={index} className="modern-card hover-lift group">
+              {rewards.map((reward) => (
+                <Card key={reward.id} className="modern-card hover-lift group">
                   <CardHeader className="text-center">
                     <div className={`w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-r ${reward.color} flex items-center justify-center text-white group-hover:scale-110 transition-transform`}>
                       {reward.icon}
                     </div>
                     <CardTitle className="text-lg">{reward.name}</CardTitle>
                     <CardDescription>{reward.description}</CardDescription>
-                    <Badge variant="outline" className="mt-2">
-                      From {reward.minAmount}
-                    </Badge>
+                    <Badge variant="outline" className="mt-2">From {reward.minAmount}</Badge>
                   </CardHeader>
                   <CardContent>
-                    <Button 
-                      className="w-full btn-premium"
-                      onClick={() => setSelectedReward(reward.id)}
-                    >
+                    <Button className="w-full btn-premium" onClick={() => setSelectedReward(reward.id)}>
                       Redeem Now
                     </Button>
                   </CardContent>
@@ -917,9 +838,9 @@ useEffect(() => {
               ))}
             </div>
 
-            {/* Cashout Form */}
+            {/* Cashout Form for selected reward */}
             {selectedReward && (
-              <Card className="modern-card max-w-2xl mx-auto">
+              <Card className="max-w-2xl mx-auto modern-card">
                 <CardHeader>
                   <CardTitle className="gradient-text">Cashout Request</CardTitle>
                   <CardDescription>
@@ -928,30 +849,31 @@ useEffect(() => {
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleCashout} className="space-y-4">
+                    {/* Amount */}
                     <div>
                       <Label htmlFor="cashoutAmount">Points Amount (Min 250)</Label>
                       <Input
                         id="cashoutAmount"
                         type="number"
-                        placeholder="Enter points amount"
+                        placeholder="Enter points"
+                        min={250}
+                        step="1"
                         value={cashoutAmount}
                         onChange={(e) => setCashoutAmount(e.target.value)}
-                        min="250"
-                        step="1"
                         required
                       />
                       <p className="text-sm text-muted-foreground mt-1">
-                        ${cashoutAmount ? ((parseFloat(cashoutAmount) - 50) / 200).toFixed(2) : '0.00'} USD equivalent
+                        ${((parseFloat(cashoutAmount) || 0) - 50) / 200?.toFixed(2) || '0.00'} USD equivalent
                       </p>
                     </div>
-
+                    {/* Reward details */}
                     {selectedReward === 'ltc' ? (
                       <div>
                         <Label htmlFor="ltcAddress">Litecoin (LTC) Address</Label>
                         <Input
                           id="ltcAddress"
                           type="text"
-                          placeholder="Enter your LTC wallet address"
+                          placeholder="Enter LTC wallet address"
                           value={cashoutLTCAddress}
                           onChange={(e) => setCashoutLTCAddress(e.target.value)}
                           required
@@ -963,7 +885,7 @@ useEffect(() => {
                         <Input
                           id="cashoutEmail"
                           type="email"
-                          placeholder="Enter your email for delivery"
+                          placeholder="Enter delivery email"
                           value={cashoutEmail}
                           onChange={(e) => setCashoutEmail(e.target.value)}
                           required
@@ -971,17 +893,18 @@ useEffect(() => {
                       </div>
                     )}
 
+                    {/* Buttons */}
                     <div className="flex justify-between pt-4">
-                      <Button 
-                        variant="outline" 
-                        onClick={() => setSelectedReward('')}
-                      >
+                      <Button variant="outline" onClick={() => setSelectedReward('')}>
                         Back
                       </Button>
-                      <Button 
-                        type="submit" 
+                      <Button
+                        type="submit"
                         className="btn-premium"
-                        disabled={!cashoutAmount || (selectedReward === 'ltc' ? !cashoutLTCAddress : !cashoutEmail)}
+                        disabled={
+                          !cashoutAmount ||
+                          (selectedReward === 'ltc' ? !cashoutLTCAddress : !cashoutEmail)
+                        }
                       >
                         Submit Cashout
                       </Button>
@@ -993,6 +916,7 @@ useEffect(() => {
           </div>
         )}
 
+        {/* Leaderboard */}
         {activeTab === 'leaderboard' && (
           <div className="text-center py-20">
             <Trophy className="w-16 h-16 mx-auto mb-4 text-primary" />
@@ -1001,6 +925,7 @@ useEffect(() => {
           </div>
         )}
 
+        {/* Profile Settings */}
         {activeTab === 'profile' && (
           <div className="text-center py-20">
             <User className="w-16 h-16 mx-auto mb-4 text-primary" />
@@ -1009,14 +934,15 @@ useEffect(() => {
           </div>
         )}
 
+        {/* Help & Support */}
         {activeTab === 'help' && (
           <div className="space-y-8 animate-fade-in">
             <div className="text-center">
               <h2 className="text-3xl font-bold gradient-text mb-4">Help & Support</h2>
               <p className="text-muted-foreground">Get assistance with your account</p>
             </div>
-
             <div className="grid md:grid-cols-2 gap-6">
+              {/* Help Details */}
               <Card className="modern-card">
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
@@ -1031,7 +957,7 @@ useEffect(() => {
                   <p>• Refer friends and earn commission bonuses</p>
                 </CardContent>
               </Card>
-
+              {/* Withdrawal Info */}
               <Card className="modern-card">
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
@@ -1051,14 +977,14 @@ useEffect(() => {
         )}
       </main>
 
-      {/* Chat Button and Panel */}
+      {/* Chat Button & Panel */}
       {isLoggedIn && (
         <div className="fixed bottom-6 right-6 z-50">
           <Sheet>
             <SheetTrigger asChild>
-              <Button 
-                variant="default" 
-                size="lg" 
+              <Button
+                variant="default"
+                size="lg"
                 className="rounded-full w-14 h-14 p-0 shadow-xl hover:scale-110 transition-transform"
                 onClick={() => setIsChatOpen(true)}
               >
@@ -1070,32 +996,25 @@ useEffect(() => {
                 <SheetHeader className="border-b p-4">
                   <SheetTitle className="flex justify-between items-center">
                     <span>Community Chat</span>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => setIsChatOpen(false)}
-                    >
+                    <Button variant="ghost" size="icon" onClick={() => setIsChatOpen(false)}>
                       <X className="w-5 h-5" />
                     </Button>
                   </SheetTitle>
                 </SheetHeader>
-                
+
+                {/* Chat Messages */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
                   {isLoadingChat ? (
                     <div className="flex items-center justify-center h-full">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
                     </div>
                   ) : chatMessages.length > 0 ? (
                     chatMessages.map((msg, index) => (
                       <div key={index} className={`flex ${msg.sender === 'You' ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[80%] rounded-lg p-3 ${msg.sender === 'You' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                          <div className="font-medium text-xs mb-1">
-                            {msg.sender}
-                          </div>
+                          <div className="font-medium text-xs mb-1">{msg.sender}</div>
                           <div>{msg.message}</div>
-                          <div className="text-xs opacity-70 mt-1 text-right">
-                            {msg.timestamp}
-                          </div>
+                          <div className="text-xs opacity-70 mt-1 text-right">{msg.timestamp}</div>
                         </div>
                       </div>
                     ))
@@ -1108,7 +1027,8 @@ useEffect(() => {
                   )}
                   <div ref={chatEndRef} />
                 </div>
-                
+
+                {/* Chat Input */}
                 <div className="border-t p-4">
                   <div className="flex space-x-2">
                     <Textarea
@@ -1123,19 +1043,11 @@ useEffect(() => {
                         }
                       }}
                     />
-                    <Button 
-                      size="icon" 
-                      onClick={sendMessage}
-                      disabled={!message.trim()}
-                    >
+                    <Button size="icon" onClick={sendMessage} disabled={!message.trim()}>
                       <Send className="w-5 h-5" />
                     </Button>
                   </div>
-                  <Button 
-                    variant="outline" 
-                    className="w-full mt-2"
-                    onClick={openSupportTicket}
-                  >
+                  <Button variant="outline" className="w-full mt-2" onClick={openSupportTicket}>
                     Create Support Ticket
                   </Button>
                 </div>
@@ -1154,7 +1066,7 @@ useEffect(() => {
             { id: 'shop', icon: ShoppingBag },
             { id: 'leaderboard', icon: Trophy },
             { id: 'profile', icon: User },
-            { id: 'help', icon: HelpCircle }
+            { id: 'help', icon: HelpCircle },
           ].map((item) => {
             const IconComponent = item.icon;
             return (
@@ -1176,12 +1088,9 @@ useEffect(() => {
       </nav>
 
       <div className="h-20 md:h-0" />
-      
-      <IframeModal 
-        isOpen={isIframeOpen} 
-        url={iframeUrl} 
-        onClose={closeIframe} 
-      />
+
+      {/* Iframe Modal for offerwalls */}
+      <IframeModal isOpen={isIframeOpen} url={iframeUrl} onClose={closeIframe} />
     </div>
   );
 };
