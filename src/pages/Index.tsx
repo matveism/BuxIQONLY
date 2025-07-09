@@ -892,31 +892,39 @@ const Index = () => {
         )}
 
         {/* Earn Tab */}
-        {activeTab === 'earn' && (
-          <div className="space-y-8 animate-fade-in">
-            {!isLoggedIn ? (
-              <Card className="max-w-md mx-auto modern-card">
-                <CardHeader>
-                  <CardTitle className="text-center gradient-text">
-                    {isSign                  <CardTitle className="text-center gradient-text">
-                    {isSignUp ? 'Register' : 'Login to Earn'} 
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <form
-                    className="space-y-4"
-                    onSubmit={isSignUp ? handleSignUp : handleLogin}
-                  >
-                    {isSignUp && (
-                      <Input
-                        placeholder="Username"
-                        value={signupForm.username}
-                        onChange={(e) =>
-                          setSignupForm((prev) => ({ ...prev, username: e.target.value }))
-                        }
-                        required
-                      />
-                    )}
+{activeTab === 'earn' && (
+  <div className="space-y-8 animate-fade-in">
+    {!isLoggedIn ? (
+      <Card className="max-w-md mx-auto modern-card">
+        <CardHeader>
+          <CardTitle className="text-center gradient-text">
+            {isSignUp ? 'Register' : 'Login to Earn'} 
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form
+            className="space-y-4"
+            onSubmit={isSignUp ? handleSignUp : handleLogin}
+          >
+            {isSignUp && (
+              <Input
+                placeholder="Username"
+                value={signupForm.username}
+                onChange={(e) =>
+                  setSignupForm((prev) => ({ ...prev, username: e.target.value }))
+                }
+                required
+              />
+            )}
+            {/* Additional inputs for email, password, etc. */}
+            {/* ... */}
+          </form>
+        </CardContent>
+      </Card>
+    )}
+    {/* Rest of your code for logged-in view */}
+  </div>
+)}
                     <Input
                       type="email"
                       placeholder="Email"
