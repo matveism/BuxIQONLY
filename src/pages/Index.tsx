@@ -27,70 +27,16 @@ import {
   X,
   Mail,
   Send,
-  ChevronDown,
-  ChevronUp,
-  Clock,
-  CheckCircle,
-  AlertCircle,
 } from 'lucide-react';
 
 import { useAuth } from '@/hooks/useAuth';
 import { useOfferwall } from '@/hooks/useOfferwall';
 import IframeModal from '@/components/IframeModal';
-import ActivityLogs from '@/components/ActivityLogs';
 import NotificationBanner from '@/components/NotificationBanner';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-
-interface UserData {
-  account: string;
-  clientId: string;
-  status: string;
-  balance: string;
-  promo: string;
-  avatar: string;
-  level: string;
-  username?: string;
-  email?: string;
-  lastOfferwallClick?: string;
-  offerwallClicksToday?: number;
-}
-
-interface Offerwall {
-  id: string;
-  name: string;
-  type: string;
-  logo: string;
-  color: string;
-  description: string;
-  badge?: string;
-}
-
-interface Reward {
-  id: string;
-  name: string;
-  icon: JSX.Element;
-  minAmount: string;
-  color: string;
-  description: string;
-  requiresEmail?: boolean;
-  requiresAddress?: boolean;
-}
-
-interface ChatMessage {
-  sender: string;
-  message: string;
-  timestamp: string;
-}
-
-interface StatItem {
-  label: string;
-  value: string;
-  icon: JSX.Element;
-}
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('home');
@@ -100,23 +46,22 @@ const Index = () => {
   const [cashoutEmail, setCashoutEmail] = useState('');
   const [cashoutLTCAddress, setCashoutLTCAddress] = useState('');
   const [message, setMessage] = useState('');
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatMessages, setChatMessages] = useState<Array<{ sender: string; message: string; timestamp: string }>>([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [activeUsers, setActiveUsers] = useState<Array<{ id: string; name: string; avatar: string }>>([]);
+  const [offerwallClicks, setOfferwallClicks] = useState(0);
+  const [lastClickTime, setLastClickTime] = useState<Date | null>(null);
   const [isSignUp, setIsSignUp] = useState(false);
   const [signupForm, setSignupForm] = useState({ username: '', email: '', password: '' });
   const [isLoadingChat, setIsLoadingChat] = useState(false);
-  const [isLoadingUserData, setIsLoadingUserData] = useState(false);
-  const [usersData, setUsersData] = useState<UserData[]>([]);
-  const [showActivityDetails, setShowActivityDetails] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const { currentUser, isLoggedIn, captchaCode, login, logout, updateBalance, generateCaptcha, register } = useAuth();
   const { isIframeOpen, iframeUrl, openOfferwall, closeIframe } = useOfferwall();
+  const chatEndRef = useRef<HTMLDivElement>(null);
   const isMobile = useMediaQuery('(max-width: 768px)');
 
-  // Sample static data
-  const offerWalls: Offerwall[] = [
+  // Static data
+  const offerWalls = [
     {
       id: 'openOfferWallCPX',
       name: 'CPX Research',
@@ -168,7 +113,7 @@ const Index = () => {
     },
   ];
 
-  const rewards: Reward[] = [
+  const rewards = [
     {
       id: 'amazon-us',
       name: 'Amazon US Gift Card',
@@ -216,23 +161,14 @@ const Index = () => {
     },
   ];
 
-  const stats: StatItem[] = [
+  const stats = [
     { label: 'Offers Completed', value: '758,502+', icon: <Target className="w-6 h-6" /> },
     { label: 'Total Distributed', value: '$362,630+', icon: <DollarSign className="w-6 h-6" /> },
     { label: 'Active Members', value: '58,236+', icon: <User className="w-6 h-6" /> },
     { label: 'Success Rate', value: '98.7%', icon: <TrendingUp className="w-6 h-6" /> },
   ];
 
-  const mobileNavItems = [
-    { id: 'home', label: 'Home', icon: Home },
-    { id: 'earn', label: 'Earn', icon: Target },
-    { id: 'shop', label: 'Shop', icon: ShoppingBag },
-    { id: 'leaderboard', label: 'Leaders', icon: Trophy },
-    { id: 'profile', label: 'Profile', icon: User },
-    { id: 'help', label: 'Help', icon: HelpCircle },
-  ];
-
-  // Handler functions (placeholders)
+  // Placeholder handlers
   const handleLogin = async () => {};
   const handleSignUp = async () => {};
   const handleLogout = () => {};
@@ -241,10 +177,15 @@ const Index = () => {
   const sendMessage = () => {};
   const fetchChatMessages = async () => {};
 
-  // Example state for user data
+  // User stats
   const userBalance = 1000; // placeholder
-  const offerwallClicksToday = 3; // placeholder
-  const lastOfferwallClick = new Date();
+  const userLevel = 1; // placeholder
+  const userXP = Math.floor(userBalance / 0.1);
+
+  // Fetch chat messages
+  useEffect(() => {
+    if (isChatOpen) fetchChatMessages();
+  }, [isChatOpen]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -254,6 +195,7 @@ const Index = () => {
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex flex-col md:flex-row md:items-center justify-between">
+          {/* Logo & Title */}
           <div className="flex items-center space-x-3">
             <div className="relative">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-primary to-secondary flex items-center justify-center animate-pulse-glow">
@@ -265,7 +207,8 @@ const Index = () => {
               <p className="text-xs text-muted-foreground"></p>
             </div>
           </div>
-          {useAuth().isLoggedIn && (
+          {/* User info */}
+          {isLoggedIn && (
             <div className={`flex ${isMobile ? 'flex-col space-y-2 mt-3' : 'items-center space-x-4'}`}>
               <div className="flex items-center space-x-3 bg-card/80 rounded-xl px-4 py-2 border border-border">
                 <Coins className="w-5 h-5 text-yellow-500" />
@@ -278,7 +221,7 @@ const Index = () => {
                 <Zap className="w-5 h-5 text-primary" />
                 <div>
                   <p className="text-xs text-muted-foreground">Level</p>
-                  <p className="font-semibold">1</p>
+                  <p className="font-semibold">{userLevel}</p>
                 </div>
               </div>
               {!isMobile && (
@@ -301,7 +244,14 @@ const Index = () => {
       <nav className="hidden md:block border-b border-border bg-card/30 backdrop-blur-xl">
         <div className="container mx-auto px-4">
           <div className="flex space-x-1 py-2">
-            {mobileNavItems.map((item) => {
+            {[
+              { id: 'home', label: 'Home', icon: Home },
+              { id: 'earn', label: 'Earn', icon: Target },
+              { id: 'shop', label: 'Shop', icon: ShoppingBag },
+              { id: 'leaderboard', label: 'Leaders', icon: Trophy },
+              { id: 'profile', label: 'Profile', icon: User },
+              { id: 'help', label: 'Help', icon: HelpCircle },
+            ].map((item) => {
               const IconComponent = item.icon;
               return (
                 <button
@@ -325,12 +275,12 @@ const Index = () => {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         {/* Activity Logs */}
-        {/* ... your activity logs component ... */}
+        {/* <ActivityLogs /> */}
 
         {/* Home Tab Content */}
         {activeTab === 'home' && (
           <div className="space-y-8">
-            {/* Hero Section */}
+            {/* Hero section */}
             <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary/20 via-secondary/20 to-background border border-border">
               <div className="absolute inset-0 bg-[linear-gradient(45deg,hsl(var(--primary)/0.1)_25%,transparent_25%,transparent_75%,hsl(var(--primary)/0.1)_75%)] bg-[length:20px_20px]" />
               <div className="relative p-8 md:p-12 text-center">
@@ -366,10 +316,8 @@ const Index = () => {
               ))}
             </div>
 
-            {/* Info Cards */}
-            <div className="grid md:grid-cols-3 gap-6">
-              {/* ... your info cards here ... */}
-            </div>
+            {/* Info cards placeholder */}
+            {/* Add your info cards here */}
           </div>
         )}
 
@@ -380,230 +328,390 @@ const Index = () => {
               <Card className="max-w-md mx-auto modern-card">
                 <CardHeader>
                   <CardTitle className="text-center gradient-text">
-                    {isSignUp ? 'Register' : 'Login to Earn'}
+                    {isSignUp ? 'Create Account' : 'Login to Continue'}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <form
-                    className="space-y-4"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      isSignUp ? handleSignUp() : handleLogin();
-                    }}
-                  >
-                    {isSignUp && (
-                      <Input
-                        placeholder="Username"
-                        value={signupForm.username}
-                        onChange={(e) =>
-                          setSignupForm((prev) => ({ ...prev, username: e.target.value }))
-                        }
-                        required
-                      />
-                    )}
-                    {/* Email */}
-                    <Input
-                      type="email"
-                      placeholder="Email"
-                      value={isSignUp ? signupForm.email : loginForm.account}
-                      onChange={(e) =>
-                        isSignUp
-                          ? setSignupForm((prev) => ({ ...prev, email: e.target.value }))
-                          : setLoginForm((prev) => ({ ...prev, account: e.target.value }))
-                      }
-                      required
-                    />
-                    {/* Password */}
-                    <Input
-                      type="password"
-                      placeholder="Password"
-                      value={isSignUp ? signupForm.password : loginForm.clientId}
-                      onChange={(e) =>
-                        isSignUp
-                          ? setSignupForm((prev) => ({ ...prev, password: e.target.value }))
-                          : setLoginForm((prev) => ({ ...prev, clientId: e.target.value }))
-                      }
-                      required
-                    />
-                    {/* Submit Button */}
-                    <Button type="submit" className="w-full">
-                      {isSignUp ? 'Register' : 'Login'}
-                    </Button>
-                  </form>
-                  {/* Toggle SignUp/Login */}
-                  <div className="mt-4 text-center text-sm text-muted-foreground">
-                    {isSignUp ? (
-                      <>
+                  {isSignUp ? (
+                    <form onSubmit={(e) => { e.preventDefault(); handleSignUp(); }} className="space-y-4">
+                      <div>
+                        <Label htmlFor="signup-username">Username</Label>
+                        <Input
+                          id="signup-username"
+                          placeholder="Choose a username"
+                          value={signupForm.username}
+                          onChange={(e) => setSignupForm(prev => ({ ...prev, username: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="signup-email">Email</Label>
+                        <Input
+                          id="signup-email"
+                          type="email"
+                          placeholder="Enter your email"
+                          value={signupForm.email}
+                          onChange={(e) => setSignupForm(prev => ({ ...prev, email: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="signup-password">Password</Label>
+                        <Input
+                          id="signup-password"
+                          type="password"
+                          placeholder="Create a password"
+                          value={signupForm.password}
+                          onChange={(e) => setSignupForm(prev => ({ ...prev, password: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <Button type="submit" className="w-full btn-premium">
+                        Sign Up
+                      </Button>
+                      <div className="text-center text-sm mt-4">
                         Already have an account?{' '}
                         <button
-                          className="underline hover:text-primary"
+                          type="button"
+                          className="text-primary hover:underline"
                           onClick={() => setIsSignUp(false)}
                         >
-                          Login here
+                          Login
                         </button>
-                      </>
-                    ) : (
-                      <>
+                      </div>
+                    </form>
+                  ) : (
+                    <form onSubmit={(e) => { e.preventDefault(); handleLogin(); }} className="space-y-4">
+                      <div>
+                        <Label htmlFor="login-account">Account Number</Label>
+                        <Input
+                          id="login-account"
+                          placeholder="Enter account number"
+                          value={loginForm.account}
+                          onChange={(e) => setLoginForm(prev => ({ ...prev, account: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="login-clientId">Client ID</Label>
+                        <Input
+                          id="login-clientId"
+                          placeholder="Enter client ID"
+                          value={loginForm.clientId}
+                          onChange={(e) => setLoginForm(prev => ({ ...prev, clientId: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="captcha">CAPTCHA</Label>
+                        <div className="bg-muted p-3 rounded-lg text-center font-mono text-lg mb-2 select-none">
+                          Enter: {captchaCode}
+                        </div>
+                        <Input
+                          id="captcha"
+                          placeholder="Enter CAPTCHA"
+                          value={loginForm.captcha}
+                          onChange={(e) => setLoginForm(prev => ({ ...prev, captcha: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <Button type="submit" className="w-full btn-premium">
+                        Login
+                      </Button>
+                      <div className="text-center text-sm mt-4">
                         Don't have an account?{' '}
                         <button
-                          className="underline hover:text-primary"
+                          type="button"
+                          className="text-primary hover:underline"
                           onClick={() => setIsSignUp(true)}
                         >
-                          Sign up
+                          Sign Up
                         </button>
-                      </>
-                    )}
-                  </div>
+                      </div>
+                    </form>
+                  )}
                 </CardContent>
               </Card>
             ) : (
-              // Logged in content
-              <div className="space-y-6">
-                <h2 className="text-xl font-semibold text-center gradient-text mb-4">
-                  Welcome Back, {currentUser?.username || currentUser?.account}
-                </h2>
-                {/* Offerwalls */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {offerWalls.map((offerwall) => (
-                    <Button
-                      key={offerwall.id}
-                      className="flex flex-col items-center p-4 rounded-xl hover-lift"
-                      style={{ background: `linear-gradient(to right, ${offerwall.color})` }}
-                      onClick={() => handleOfferwallClick(offerwall.id)}
-                    >
-                      <img src={offerwall.logo} alt={offerwall.name} className="w-12 h-12 mb-2" />
-                      <span className="text-center font-medium">{offerwall.name}</span>
-                      {offerwall.badge && (
-                        <Badge variant="secondary" className="mt-2">
-                          {offerwall.badge}
-                        </Badge>
+              <div className="space-y-8">
+                {/* Dashboard */}
+                <Card className="modern-card">
+                  <CardHeader>
+                    <div className="flex justify-between items-center mb-4">
+                      <CardTitle className="gradient-text">Earning Dashboard</CardTitle>
+                      {!isMobile && (
+                        <Button variant="outline" onClick={handleLogout}>
+                          Logout
+                        </Button>
                       )}
-                    </Button>
-                  ))}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {/* User Stats */}
+                    <div className="grid md:grid-cols-3 gap-4 mb-6">
+                      <div className="bg-gradient-to-r from-primary/10 to-primary/5 p-4 rounded-lg border border-primary/20">
+                        <div className="flex items-center space-x-3">
+                          <Coins className="w-8 h-8 text-primary" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Balance</p>
+                            <p className="font-bold">{userBalance} pts</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="bg-gradient-to-r from-secondary/10 to-secondary/5 p-4 rounded-lg border border-secondary/20">
+                        <div className="flex items-center space-x-3">
+                          <Zap className="w-8 h-8 text-secondary" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Level</p>
+                            <p className="font-bold">{userLevel}</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="bg-gradient-to-r from-green-500/10 to-green-500/5 p-4 rounded-lg border border-green-500/20">
+                        <div className="flex items-center space-x-3">
+                          <Star className="w-8 h-8 text-green-500" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">XP</p>
+                            <p className="font-bold">{userXP}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    {/* XP Progress */}
+                    <div className="mb-6">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm text-muted-foreground">Progress to Next Level</span>
+                        <span className="text-sm text-muted-foreground">{userXP} XP</span>
+                      </div>
+                      <Progress value={(userXP / 1000) * 100} className="h-2" />
+                    </div>
+                    {/* Daily Offerwall Clicks */}
+                    <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 mb-6">
+                      <div className="flex items-center space-x-3">
+                        <Zap className="w-5 h-5 text-yellow-500" />
+                        <div>
+                          <p className="font-medium">Daily Offerwall Clicks</p>
+                          <p className="text-sm text-muted-foreground">
+                            {offerwallClicks}/5 clicks completed
+                          </p>
+                          <Progress value={(offerwallClicks / 5) * 100} className="h-2 mt-2" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Offerwalls */}
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {offerWalls.map((wall) => (
+                        <Card key={wall.id} className="modern-card hover-lift group">
+                          <CardHeader>
+                            <div className="flex items-center justify-between mb-4">
+                              <img src={wall.logo} alt={wall.name} className="h-8 object-contain" />
+                              {wall.badge && (
+                                <Badge variant="secondary" className="text-xs">
+                                  {wall.badge}
+                                </Badge>
+                              )}
+                            </div>
+                            <CardTitle className="text-lg">{wall.name}</CardTitle>
+                            <CardDescription>{wall.description}</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <Button
+                              className={`w-full bg-gradient-to-r ${wall.color} hover:scale-105 transition-transform`}
+                              onClick={() => handleOfferwallClick(wall.id)}
+                            >
+                              Open {wall.type}
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Rewards shop and cashout */}
+                <div className="space-y-8">
+                  <h2 className="text-xl font-bold gradient-text mb-4">Rewards Shop</h2>
+                  {/* Rewards grid */}
+                  <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {rewards.map((reward) => (
+                      <Card key={reward.id} className="modern-card hover-lift">
+                        <CardHeader className="text-center">
+                          <div className={`w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-r ${reward.color} flex items-center justify-center text-white`}>
+                            {reward.icon}
+                          </div>
+                          <CardTitle className="text-lg">{reward.name}</CardTitle>
+                          <CardDescription>{reward.description}</CardDescription>
+                          <Badge variant="outline" className="mt-2">
+                            From {reward.minAmount}
+                          </Badge>
+                        </CardHeader>
+                        <CardContent>
+                          <Button
+                            className="w-full btn-premium"
+                            onClick={() => setSelectedReward(reward.id)}
+                          >
+                            Redeem Now
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                  {/* Cashout form */}
+                  {selectedReward && (
+                    <Card className="modern-card max-w-2xl mx-auto">
+                      <CardHeader>
+                        <CardTitle className="gradient-text">Cashout for {rewards.find(r => r.id === selectedReward)?.name}</CardTitle>
+                        <CardDescription>Minimum 250 points (200 pts = $1 + 50 pts fee)</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <form onSubmit={handleCashout} className="space-y-4">
+                          <div>
+                            <Label htmlFor="cashoutAmount">Points Amount</Label>
+                            <Input
+                              id="cashoutAmount"
+                              type="number"
+                              placeholder="Enter points"
+                              value={cashoutAmount}
+                              onChange={(e) => setCashoutAmount(e.target.value)}
+                              min="250"
+                              required
+                            />
+                          </div>
+                          {selectedReward === 'ltc' ? (
+                            <div>
+                              <Label htmlFor="ltcAddress">Litecoin Address</Label>
+                              <Input
+                                id="ltcAddress"
+                                placeholder="Your LTC address"
+                                value={cashoutLTCAddress}
+                                onChange={(e) => setCashoutLTCAddress(e.target.value)}
+                                required
+                              />
+                            </div>
+                          ) : (
+                            <div>
+                              <Label htmlFor="cashoutEmail">Email Address</Label>
+                              <Input
+                                id="cashoutEmail"
+                                type="email"
+                                placeholder="Your email"
+                                value={cashoutEmail}
+                                onChange={(e) => setCashoutEmail(e.target.value)}
+                                required
+                              />
+                            </div>
+                          )}
+                          <div className="flex justify-between pt-4">
+                            <Button variant="outline" onClick={() => setSelectedReward('')}>
+                              Back
+                            </Button>
+                            <Button
+                              type="submit"
+                              className="btn-premium"
+                              disabled={!cashoutAmount || (selectedReward === 'ltc' ? !cashoutLTCAddress : !cashoutEmail)}
+                            >
+                              Submit Cashout
+                            </Button>
+                          </div>
+                        </form>
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
               </div>
             )}
-            {/* Cashout Section */}
-            <div className="mt-8">
-              <h3 className="text-lg font-semibold mb-4 text-center gradient-text">Cash Out Your Points</h3>
-              <form onSubmit={handleCashout} className="max-w-xl mx-auto space-y-4">
-                <Input
-                  type="number"
-                  placeholder="Amount (minimum 250 pts)"
-                  value={cashoutAmount}
-                  onChange={(e) => setCashoutAmount(e.target.value)}
-                  min={250}
-                  required
-                />
-                {/* Reward Type */}
-                <div>
-                  <Label>Select Reward Type</Label>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {rewards.map((reward) => (
-                      <Button
-                        key={reward.id}
-                        variant={selectedReward === reward.id ? 'primary' : 'outline'}
-                        onClick={() => setSelectedReward(reward.id)}
-                        className="flex items-center gap-2"
-                      >
-                        {reward.icon}
-                        <span className="text-sm">{reward.name}</span>
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-                {/* Conditional inputs based on reward */}
-                {selectedReward === 'ltc' && (
-                  <Input
-                    placeholder="Litecoin Address"
-                    value={cashoutLTCAddress}
-                    onChange={(e) => setCashoutLTCAddress(e.target.value)}
-                    required
-                  />
-                )}
-                {selectedReward !== 'ltc' && (
-                  <Input
-                    type="email"
-                    placeholder="Your Email"
-                    value={cashoutEmail}
-                    onChange={(e) => setCashoutEmail(e.target.value)}
-                    required
-                  />
-                )}
-                <Button type="submit" className="w-full mt-4">
-                  Submit Cashout
-                </Button>
-              </form>
-            </div>
           </div>
         )}
-        {/* Additional tabs like shop, profile, etc. can go here */}
+
+        {/* Profile, leaderboard, help tabs can be added similarly */}
+
       </main>
 
-      {/* Chat modal */}
-      {isChatOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
-          <div className="bg-background rounded-lg shadow-lg max-w-2xl w-full flex flex-col h-full max-h-full">
-            <div className="flex justify-between items-center p-4 border-b border-border">
-              <h3 className="text-lg font-semibold">Chat with Support</h3>
-              <button
-                className="text-muted-foreground hover:text-primary"
-                onClick={() => setIsChatOpen(false)}
-              >
-                X
-              </button>
-            </div>
-            <div className="flex-1 p-4 overflow-y-auto space-y-2">
-              {chatMessages.map((msg, index) => (
-                <div
-                  key={index}
-                  className={`flex ${
-                    msg.sender === currentUser?.username ? 'justify-end' : 'justify-start'
-                  }`}
-                >
-                  <div
-                    className={`max-w-xs p-2 rounded-lg ${
-                      msg.sender === currentUser?.username
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted'
-                    }`}
-                  >
-                    <p className="text-sm">{msg.message}</p>
-                    <div className="text-xs text-muted-foreground text-right">{msg.timestamp}</div>
-                  </div>
-                </div>
-              ))}
-              <div ref={chatEndRef} />
-            </div>
-            <div className="p-4 border-t border-border">
-              <div className="flex space-x-2">
-                <input
-                  type="text"
-                  className="flex-1 p-2 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="Type your message..."
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && (sendMessage(), e.preventDefault())}
-                />
-                <Button onClick={sendMessage}>Send</Button>
-              </div>
+      {/* Chat Button */}
+      {isLoggedIn && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <Sheet>
+            <SheetTrigger asChild>
               <Button
-                variant="outline"
-                size="sm"
-                className="mt-2 w-full"
-                onClick={() => toast('Support Ticket Created!')}
+                variant="default"
+                size="lg"
+                className="rounded-full w-14 h-14 p-0 shadow-xl hover:scale-110 transition-transform"
+                onClick={() => setIsChatOpen(true)}
               >
-                Create Support Ticket
+                <MessageCircle className="w-6 h-6" />
               </Button>
-            </div>
-          </div>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-full sm:w-[400px] p-0">
+              <div className="h-full flex flex-col">
+                <SheetHeader className="border-b p-4">
+                  <div className="flex justify-between items-center">
+                    <SheetTitle className="flex items-center justify-center w-full">
+                      <span>Community Chat</span>
+                    </SheetTitle>
+                    <Button variant="ghost" size="icon" onClick={() => setIsChatOpen(false)}>
+                      <X className="w-5 h-5" />
+                    </Button>
+                  </div>
+                </SheetHeader>
+                <div className="flex-1 p-4 overflow-y-auto space-y-4">
+                  {isLoadingChat ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    </div>
+                  ) : chatMessages.length > 0 ? (
+                    chatMessages.map((msg, i) => (
+                      <div key={i} className={`flex ${msg.sender === 'You' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[80%] p-3 rounded-lg ${msg.sender === 'You' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                          <div className="font-medium text-xs mb-1">{msg.sender}</div>
+                          <div>{msg.message}</div>
+                          <div className="text-xs opacity-70 mt-1 text-right">{msg.timestamp}</div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
+                      <Mail className="w-10 h-10 mb-4" />
+                      <p>No messages yet</p>
+                      <p className="text-sm">Start chatting with the community!</p>
+                    </div>
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+                <div className="border-t p-4">
+                  <div className="flex space-x-2">
+                    <Textarea
+                      placeholder="Type your message..."
+                      className="resize-none"
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          sendMessage();
+                        }
+                      }}
+                    />
+                    <Button onClick={sendMessage} disabled={!message.trim()}>
+                      <Send className="w-5 h-5" />
+                    </Button>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="w-full mt-2"
+                    onClick={openSupportTicket}
+                  >
+                    Create Support Ticket
+                  </Button>
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       )}
 
-      {/* Iframe Modal for Offerwalls */}
-      {isIframeOpen && (
-        <IframeModal url={iframeUrl} onClose={closeIframe} />
-      )}
+      {/* Iframe Modal */}
+      <IframeModal isOpen={isIframeOpen} url={iframeUrl} onClose={closeIframe} />
     </div>
   );
 };
