@@ -36,6 +36,7 @@ import NotificationBanner from '@/components/NotificationBanner';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('home');
@@ -52,15 +53,59 @@ const Index = () => {
   const [lastClickTime, setLastClickTime] = useState<Date | null>(null);
   const [isSignUp, setIsSignUp] = useState(false);
   const [signupForm, setSignupForm] = useState({ username: '', email: '', password: '' });
+  const [isLoadingChat, setIsLoadingChat] = useState(false);
   
   const { currentUser, isLoggedIn, captchaCode, login, logout, updateBalance, generateCaptcha, register } = useAuth();
   const { isIframeOpen, iframeUrl, openOfferwall, closeIframe } = useOfferwall();
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const isMobile = useMediaQuery('(max-width: 768px)');
 
   // Calculate user stats
   const userBalance = currentUser ? parseFloat(currentUser.balance || '0') : 0;
   const userLevel = currentUser ? parseInt(currentUser.level || '1') : 1;
   const userXP = Math.floor(userBalance / 0.1); // Simple XP calculation
+
+  // Fetch chat messages from CSV
+  const fetchChatMessages = async () => {
+    try {
+      setIsLoadingChat(true);
+      const response = await fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vTMw2OEzCGbQOpzjj47sjvSlKqeLBC14FkZ6gGKnI3r4roaYapdByCLpYsLDFmbxbk87aCb5ChNjwZP/pub?gid=0&single=true&output=csv');
+      const csvData = await response.text();
+      
+      // Parse CSV data
+      const lines = csvData.split('\n');
+      const headers = lines[0].split(',');
+      const messages = [];
+      
+      for (let i = 1; i < lines.length; i++) {
+        const currentLine = lines[i].split(',');
+        if (currentLine.length === headers.length) {
+          const messageObj: any = {};
+          for (let j = 0; j < headers.length; j++) {
+            messageObj[headers[j].trim()] = currentLine[j].trim();
+          }
+          messages.push({
+            sender: messageObj.sender || 'Unknown',
+            message: messageObj.message || '',
+            timestamp: messageObj.timestamp || new Date().toLocaleTimeString()
+          });
+        }
+      }
+      
+      setChatMessages(messages);
+    } catch (error) {
+      console.error('Error fetching chat messages:', error);
+      toast.error('Failed to load chat messages');
+    } finally {
+      setIsLoadingChat(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isChatOpen && isLoggedIn) {
+      fetchChatMessages();
+    }
+  }, [isChatOpen, isLoggedIn]);
 
   // Track offerwall clicks for active user requirement
   useEffect(() => {
@@ -88,16 +133,33 @@ const Index = () => {
   }, [offerwallClicks, lastClickTime, isLoggedIn]);
 
   // Postback when user requests cashout
-  const sendCashoutPostback = async (amount: number, rewardType: string) => {
+  const sendCashoutPostback = async (amount: number, rewardType: string, account: string) => {
     try {
-      // In a real app, you would call your backend API
-      // await fetch('/api/cashout-postback', {
-      //   method: 'POST',
-      //   body: JSON.stringify({ amount, rewardType, userId: currentUser?.id })
-      // });
+      const postbackUrl = `https://script.google.com/macros/s/AKfycbyvw4LiShTvgnTTLRLISnTYJRhqeStmZgL9YD_ZuQEJubcDPH8bSbGpHPCVHDfx0dbW/exec`;
+      
+      const response = await fetch(postbackUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          amount,
+          rewardType,
+          account,
+          timestamp: new Date().toISOString()
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send postback');
+      }
+
       console.log(`Postback sent for cashout: ${amount} points to ${rewardType}`);
+      return true;
     } catch (error) {
       console.error('Error sending cashout postback:', error);
+      toast.error('Failed to process cashout request. Please try again later.');
+      return false;
     }
   };
 
@@ -151,7 +213,7 @@ const Index = () => {
     openOfferwall(buttonId, currentUser.username || currentUser.account);
   };
 
-  const handleCashout = (e: React.FormEvent) => {
+  const handleCashout = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isLoggedIn || !currentUser) {
       toast.error('Please login first to cash out');
@@ -169,7 +231,7 @@ const Index = () => {
       return;
     }
 
-    if (points > userBalance * 1) {
+    if (points > userBalance) {
       toast.error('You don\'t have enough points for this cashout');
       return;
     }
@@ -180,33 +242,51 @@ const Index = () => {
     }
 
     // Validate based on reward type
-    if (selectedReward === 'LTC' && !cashoutLTCAddress) {
+    if (selectedReward === 'ltc' && !cashoutLTCAddress) {
       toast.error('Please enter your Litecoin address');
       return;
     }
 
-    if (selectedReward !== 'LTC' && !cashoutEmail) {
+    if (selectedReward !== 'ltc' && !cashoutEmail) {
       toast.error('Please enter your email address');
       return;
     }
 
-    // Send cashout postback
-    sendCashoutPostback(points, selectedReward);
+    try {
+      // Send cashout postback first
+      const postbackSuccess = await sendCashoutPostback(
+        points, 
+        selectedReward, 
+        currentUser.account
+      );
 
-    toast.success(`Cashout request submitted for ${points} points ($${(points - 50) / 200}) to ${selectedReward}. Processing may take 1-3 business days.`);
-    
-    // Reset form
-    setCashoutAmount('');
-    setSelectedReward('');
-    setCashoutEmail('');
-    setCashoutLTCAddress('');
+      if (!postbackSuccess) {
+        return;
+      }
+
+      // Deduct balance locally (in a real app, this would be handled by the backend)
+      const newBalance = userBalance - points;
+      updateBalance(newBalance.toString());
+
+      // Show success message
+      toast.success(`Cashout request submitted for ${points} points ($${(points - 50) / 200}) to ${selectedReward}. Processing may take 1-3 business days.`);
+      
+      // Reset form
+      setCashoutAmount('');
+      setSelectedReward('');
+      setCashoutEmail('');
+      setCashoutLTCAddress('');
+    } catch (error) {
+      console.error('Cashout error:', error);
+      toast.error('Failed to process cashout. Please try again.');
+    }
   };
 
   const sendMessage = () => {
-    if (!message.trim()) return;
+    if (!message.trim() || !currentUser) return;
     
     const newMessage = {
-      sender: currentUser?.username || 'You',
+      sender: currentUser.username || currentUser.account || 'You',
       message: message,
       timestamp: new Date().toLocaleTimeString()
     };
@@ -218,11 +298,16 @@ const Index = () => {
     setTimeout(() => {
       chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, 100);
+
+    // In a real app, you would send this message to your backend
+    // and update the CSV through Google Apps Script
   };
 
   const openSupportTicket = () => {
+    if (!currentUser) return;
+    
     const ticketMessage = {
-      sender: currentUser?.username || 'Support Ticket',
+      sender: currentUser.username || currentUser.account || 'Support Ticket',
       message: 'I need help with my account',
       timestamp: new Date().toLocaleTimeString()
     };
@@ -358,7 +443,7 @@ const Index = () => {
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="relative">
                 <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-primary to-secondary flex items-center justify-center animate-pulse-glow">
@@ -372,7 +457,7 @@ const Index = () => {
             </div>
 
             {isLoggedIn && currentUser && (
-              <div className="hidden md:flex items-center space-x-4">
+              <div className={`flex ${isMobile ? 'flex-col space-y-2 mt-3' : 'items-center space-x-4'}`}>
                 <div className="flex items-center space-x-3 bg-card/80 rounded-xl px-4 py-2 border border-border">
                   <Coins className="w-5 h-5 text-yellow-500" />
                   <div>
@@ -387,10 +472,21 @@ const Index = () => {
                     <p className="font-semibold">{userLevel}</p>
                   </div>
                 </div>
-                <Avatar className="h-10 w-10 border-2 border-primary/50">
-                  <AvatarImage src={currentUser.avatar || `https://ui-avatars.com/api/?background=8b5cf6&color=fff&name=${encodeURIComponent(currentUser.username || 'User')}`} />
-                  <AvatarFallback>{(currentUser.username || 'U').charAt(0).toUpperCase()}</AvatarFallback>
-                </Avatar>
+                {!isMobile && (
+                  <Avatar className="h-10 w-10 border-2 border-primary/50">
+                    <AvatarImage src={currentUser.avatar || `https://ui-avatars.com/api/?background=8b5cf6&color=fff&name=${encodeURIComponent(currentUser.username || 'User')}`} />
+                    <AvatarFallback>{(currentUser.username || 'U').charAt(0).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                )}
+                {isMobile && (
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={handleLogout}
+                  >
+                    Logout
+                  </Button>
+                )}
               </div>
             )}
           </div>
@@ -695,9 +791,11 @@ const Index = () => {
                         <CardTitle className="gradient-text">Earning Dashboard</CardTitle>
                         <CardDescription>Complete offers to earn rewards</CardDescription>
                       </div>
-                      <Button variant="outline" onClick={handleLogout}>
-                        Logout
-                      </Button>
+                      {!isMobile && (
+                        <Button variant="outline" onClick={handleLogout}>
+                          Logout
+                        </Button>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -992,7 +1090,11 @@ const Index = () => {
                 </SheetHeader>
                 
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                  {chatMessages.length > 0 ? (
+                  {isLoadingChat ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    </div>
+                  ) : chatMessages.length > 0 ? (
                     chatMessages.map((msg, index) => (
                       <div key={index} className={`flex ${msg.sender === 'You' ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[80%] rounded-lg p-3 ${msg.sender === 'You' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
